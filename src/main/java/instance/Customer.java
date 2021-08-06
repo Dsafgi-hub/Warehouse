@@ -1,10 +1,10 @@
 package instance;
 
+import service.WarehouseService;
+
 import java.util.Random;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 public class Customer implements Runnable {
 
@@ -22,39 +22,33 @@ public class Customer implements Runnable {
     }
 
     @Override
-    public synchronized void run() {
+    public void run() {
+        try {
+            while (!warehouse.isEmpty()) {
+                barrier.await();
+                buy();
+                barrier.await();
+            }
+        } catch (InterruptedException e) {
+            System.out.println("Внимание! Во время работы программы возникла ошибка завершения потока");
+        } catch (BrokenBarrierException e) {
+            System.out.println("Внимание! Во время работы программы возникла ошибка многопоточности");
+        }
+        printResult();
+    }
+
+    private void buy() {
         Random random = new Random();
         int count = random.nextInt(10) + 1;
-
-        while (!warehouse.isEmpty()) {
-           totalAmount += warehouse.sell(count);
-           numberOfPurchases++;
-           try {
-               barrier.await(5, TimeUnit.SECONDS);
-           } catch (InterruptedException e) {
-               System.out.println("Внимание! Во время работы программы возникла ошибка завершения потока");
-
-           } catch (BrokenBarrierException e) {
-               System.out.println("Внимание! Во время работы программы возникла ошибка многопоточности");
-           } catch (TimeoutException e) {
-               System.out.println("Внимание! Во время работы программы возникла временная ошибка у одного из потоков");
-           }
+        int currentAmount = warehouse.sell(count);
+        if (currentAmount != 0) {
+            totalAmount += currentAmount;
+            numberOfPurchases++;
         }
-
-
-        resetBarrier(barrier);
-
-        printResult();
     }
 
     public void printResult() {
         System.out.println("Номер покупателя: " + customerNumber + ". Количество покупок " + numberOfPurchases +
                 " на общую сумму " + totalAmount);
-    }
-
-    public void resetBarrier(CyclicBarrier barrier) {
-        if (barrier.isBroken()) {
-           barrier.reset();
-        }
     }
 }
